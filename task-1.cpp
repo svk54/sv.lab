@@ -3,11 +3,13 @@
 using namespace std; 
 int main()
 {
+setlocale(LC_ALL, "Russian");
 int a,b;
 double F;
-cout << "Input a:"; cin >> a;
-cout << "Input b: "; cin >> b;
+cout << "Линейный алгоритм \n";
+cout << "Введите a:"; cin >> a;
+cout << "Введите b: "; cin >> b;
 F=(8,15*pow(b,1/3)*log(a))/(24.38*cos(b)*(exp(a)-pow(a,2)));
-cout <<"F="<<F << "\n";
+cout <<"F="<<F<< "\n";
 return 0;
 }
