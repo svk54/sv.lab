@@ -9,7 +9,7 @@ double F;
 cout << "Линейный алгоритм \n";
 cout << "Введите a:"; cin >> a;
 cout << "Введите b: "; cin >> b;
-F=(8,15*pow(b,1/3)*log(a))/(24.38*cos(b)*(exp(a)-pow(a,2)));
+F=(8,15*cbrt(b)*log(a))/(24.38*cos(b)*(exp(a)-pow(a,2)));
 cout <<"F="<<F<< "\n";
 return 0;
 }
