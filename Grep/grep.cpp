@@ -1,120 +1,123 @@
 #include <iostream>
 #include <fstream>
-#include <string>
+#include <regex>
 #include <vector>
+#include <string>
+#include <windows.h>
+#include <locale>
+#include <codecvt>
 
-using namespace std;
 
-char Lower(char ch) {
-    if (ch >= 'A' && ch <= 'Z') {
-        return ch - 'A' + 'a';
-    }
-    return ch;
-}
-string LowerCase(const string& str) {
-    string lower;
-    for (char ch : str) {
-        lower += Lower(ch);
-    }
-    return lower;
-}
-    class Grep {
-public:
-    void searchInFiles(const vector<string>& filenames, const vector<string>& patterns, bool ignoreCase, bool invertMatch, bool countMatches, bool listFiles, bool lineNumber, bool noFileName, bool suppressErrors, bool onlyMatching) {
-        vector<string> matchedFiles;
-        int totalMatches = 0;
-        vector<string> lowerPatterns;
-        if (ignoreCase) {
-            for (const auto& pattern : patterns) {
-                lowerPatterns.push_back(LowerCase(pattern));
-            }
-        } else {
-            lowerPatterns = patterns;
-        }
-        for (const auto& filename : filenames) {
-            ifstream file(filename);
-            if (!file.is_open()) {
-                if (!suppressErrors) {
-                    cerr <<" Не удается открыть файл " << filename << endl;
-                }
-                continue;
-            }
-            string line;
-            int lineCount = 0;
-            int matchCount = 0;
-            while (getline(file, line)) {
-                ++lineCount;
-                string originalLine = line;
-                if (ignoreCase) {
-                    line = LowerCase(line);
-                }
-                bool matched = false;
-                for (const auto& pattern : lowerPatterns) {
-                    size_t pos = line.find(pattern);
-                    while (pos != string::npos) {
-                        matched = true;
-                        if (onlyMatching && !invertMatch) {
-                            string matchStr = originalLine.substr(pos, pattern.size());
-                            if (lineNumber && !noFileName) {
-                                cout << filename << ":" << lineCount << ":" << matchStr << endl;
-                            } else if (noFileName) {
-                                cout << matchStr << endl;
-                            } else {
-                                cout << filename << ":" << matchStr << endl;
-                            }
-                        }
-                        pos = line.find(pattern, pos + 1);
-                        ++matchCount;
-                    }
-                }
-                if (invertMatch && !matched) {
-                    cout << originalLine << endl;
-                }
-            }
-            if (countMatches) {
-                cout << filename << ": " << matchCount << " совпадений" << endl;
-            }
-            if (matchCount > 0 && listFiles && !invertMatch) {
-                matchedFiles.push_back(filename);
-            }
-        }
-        if (listFiles && !invertMatch) {
-            for (const auto& file : matchedFiles) {
-                cout << file << endl;
-            }
-        }
-        if (countMatches) {
-            cout << "Общее количество совпадений: " << totalMatches << endl;
-        }
-    }
-};
-vector<string> readPatternsFromFile(const string& filename) {
-    vector<string> patterns;
-    ifstream file(filename);
-    if (!file.is_open()) {
-        cerr << "Не удается открыть файл шаблона " << filename << endl;
-        return patterns;
-    }
-    string pattern;
-    while (getline(file, pattern)) {
-        if (!pattern.empty()) {
-            patterns.push_back(pattern);
-        }
-    }
-    return patterns;
-}
-int main() {
-    Grep grep;
-    vector<string> filenames = {"Files1.txt", "Files2.txt"};
-    vector<string> patterns = readPatternsFromFile("Obr.txt"); 
-    bool ignoreCase = true; // -i опция
-    bool invertMatch = true; // -v опция
-    bool countMatches = true; // -c опция
-    bool listFiles = true; // -l опция
-    bool lineNumber = true; // -n опция
-    bool noFileName = true; // -h опция
-    bool suppressErrors = true; // -s опция
-    bool onlyMatching = true; // -o опция
-    grep.searchInFiles(filenames, patterns, ignoreCase, invertMatch, countMatches, listFiles, lineNumber, noFileName, suppressErrors, onlyMatching);
-    return 0;
+void searchInFile(const std::string& filename, const std::string& searchTerm, bool ignoreCase, bool invertMatch, bool countOnly, bool matchFilesOnly, bool printLineNumbers, bool printMatchingParts) {
+	std::ifstream file(filename);
+
+	if (!file.is_open()) {
+		std::cerr << "Cannot open file: " << filename << std::endl;
+		return;
+	}
+
+	std::string line;
+	int lineNumber = 0;
+	int matchCount = 0;
+	std::regex::flag_type flags = std::regex_constants::ECMAScript;
+
+	if (ignoreCase) {
+		flags |= std::regex_constants::icase;
+	}
+
+	std::regex pattern(searchTerm, flags);
+	std::vector<int> matchingLines;
+
+	while (std::getline(file, line)) {
+		lineNumber++;
+		bool match = std::regex_search(line, pattern);  
+		if (invertMatch) {
+			match = !match;
+		}
+
+		if (match) {
+			matchCount++;
+
+				if (matchFilesOnly) {
+				matchingLines.push_back(lineNumber);
+				break;
+			}
+
+			if (!countOnly) {
+				if (printLineNumbers) {
+					std::cout << lineNumber << ": ";
+				}
+
+				if (printMatchingParts) {
+					std::smatch matchResult;
+					std::regex_search(line, matchResult, pattern);
+
+					for (const auto& part : matchResult) {
+						if (!part.str().empty()) {
+							std::cout << part.str() << " ";
+						}
+					}
+					std::cout << std::endl;
+				}
+				else {
+					std::cout << line << std::endl;
+				}
+			}
+		}
+	}
+
+	if (countOnly) {
+		std::cout << matchCount << std::endl;
+	}
+	else if (matchFilesOnly && !matchingLines.empty()) {
+		std::cout << filename << std::endl;
+	}
+
+	file.close(); 
+
+int main(int argc, char* argv[]) {
+	SetConsoleOutputCP(1251);
+	SetConsoleCP(1251);
+	setlocale(LC_ALL, "rus");
+
+	if (argc < 2) {
+		std::cerr << "Usage: " << argv[0] << " <filename> <searchTerm> [options]" << std::endl;
+		return 1;
+	}
+
+	std::string filename = argv[1];
+	std::string searchTerm = argv[2];
+
+	bool ignoreCase = false; // -i опция
+	bool invertMatch = false;  // -v опция
+	bool countMatches = false; // -c опция
+	bool matchFilesOnly = false; // -l опция
+	bool lineNumber = false; // -n опция
+	bool matchingFile = false; // -o опция
+
+	for (int i = 3; i < argc; i++) {
+		std::string option = argv[i];
+		if (option == "-i") {
+			ignoreCase = true;
+		}
+		else if (option == "-v") {
+			invertMatch = true;
+		}
+		else if (option == "-c") {
+			countMatches = true;
+		}
+		else if (option == "-l") {
+			matchFilesOnly = true;
+		}
+		else if (option == "-n") {
+			lineNumber = true;
+		}
+		else if (option == "-o") {
+			matchingFile = true;
+		}
+	}
+
+	searchInFile(filename, searchTerm, ignoreCase, invertMatch, countMatches, matchFilesOnly, lineNumber, matchingFile);
+
+	return 0;
 }
