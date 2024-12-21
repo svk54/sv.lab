@@ -1,123 +1,124 @@
 #include <iostream>
 #include <fstream>
 #include <regex>
-#include <vector>
 #include <string>
-#include <windows.h>
-#include <locale>
-#include <codecvt>
+#include <vector>
+#include <algorithm>
 
+void grep(const std::string& template_str, const std::vector<std::string>& filenames, bool ignore_case, bool invert_match, bool count, bool print_file_names, bool line_number, bool suppress_errors, bool only_matching) {
+    std::regex::flag_type flags = std::regex::ECMAScript;
+    if (ignore_case) {
+        flags |= std::regex::icase;
+    }
 
-void searchInFile(const std::string& filename, const std::string& searchTerm, bool ignoreCase, bool invertMatch, bool countOnly, bool matchFilesOnly, bool printLineNumbers, bool printMatchingParts) {
-	std::ifstream file(filename);
+    std::regex pattern(template_str, flags);
 
-	if (!file.is_open()) {
-		std::cerr << "Cannot open file: " << filename << std::endl;
-		return;
-	}
+    for (const auto& filename : filenames) {
+        std::ifstream file(filename);
+        if (!file) {
+            if (!suppress_errors) {
+                std::cerr << "grep: " << filename << ": No such file or directory" << std::endl;
+            }
+            continue;
+        }
 
-	std::string line;
-	int lineNumber = 0;
-	int matchCount = 0;
-	std::regex::flag_type flags = std::regex_constants::ECMAScript;
+        std::string line;
+        int line_number_count = 0;
+        int match_count = 0;
 
-	if (ignoreCase) {
-		flags |= std::regex_constants::icase;
-	}
+        while (std::getline(file, line)) {
+            line_number_count++;
+            bool match = std::regex_search(line, pattern);
 
-	std::regex pattern(searchTerm, flags);
-	std::vector<int> matchingLines;
+            if (invert_match) {
+                match = !match;
+            }
 
-	while (std::getline(file, line)) {
-		lineNumber++;
-		bool match = std::regex_search(line, pattern);  
-		if (invertMatch) {
-			match = !match;
-		}
+            if (match) {
+                match_count++;
+                if (count) {
+                    continue;
+                }
+                if (print_file_names) {
+                    std::cout << filename << ":";
+                }
+                if (line_number) {
+                    std::cout << line_number_count << ":";
+                }
+                if (only_matching) {
+                    std::smatch matches;
+                    if (std::regex_search(line, matches, pattern)) {
+                        std::cout << matches.str() << std::endl;
+                    }
+                } else {
+                    std::cout << line << std::endl;
+                }
+            }
+        }
 
-		if (match) {
-			matchCount++;
-
-				if (matchFilesOnly) {
-				matchingLines.push_back(lineNumber);
-				break;
-			}
-
-			if (!countOnly) {
-				if (printLineNumbers) {
-					std::cout << lineNumber << ": ";
-				}
-
-				if (printMatchingParts) {
-					std::smatch matchResult;
-					std::regex_search(line, matchResult, pattern);
-
-					for (const auto& part : matchResult) {
-						if (!part.str().empty()) {
-							std::cout << part.str() << " ";
-						}
-					}
-					std::cout << std::endl;
-				}
-				else {
-					std::cout << line << std::endl;
-				}
-			}
-		}
-	}
-
-	if (countOnly) {
-		std::cout << matchCount << std::endl;
-	}
-	else if (matchFilesOnly && !matchingLines.empty()) {
-		std::cout << filename << std::endl;
-	}
-
-	file.close(); 
+        if (count && match_count > 0) {
+            std::cout << filename << ": " << match_count << std::endl;
+        }
+    }
+}
 
 int main(int argc, char* argv[]) {
-	SetConsoleOutputCP(1251);
-	SetConsoleCP(1251);
-	setlocale(LC_ALL, "rus");
+    bool ignore_case = false;
+    bool invert_match = false;
+    bool count = false;
+    bool print_file_names = true;
+    bool line_number = false;
+    bool suppress_errors = false;
+    bool only_matching = false;
 
-	if (argc < 2) {
-		std::cerr << "Usage: " << argv[0] << " <filename> <searchTerm> [options]" << std::endl;
-		return 1;
-	}
+    std::string template_str;
+    std::vector<std::string> filenames;
 
-	std::string filename = argv[1];
-	std::string searchTerm = argv[2];
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
 
-	bool ignoreCase = false; // -i опция
-	bool invertMatch = false;  // -v опция
-	bool countMatches = false; // -c опция
-	bool matchFilesOnly = false; // -l опция
-	bool lineNumber = false; // -n опция
-	bool matchingFile = false; // -o опция
+        if (arg == "-e" && i + 1 < argc) {
+            template_str = argv[++i];
+        }
+        else if (arg == "-i") {
+            ignore_case = true;
+        }
+        else if (arg == "-v") {
+            invert_match = true;
+        }
+        else if (arg == "-c") {
+            count = true;
+        }
+        else if (arg == "-l") {
+            print_file_names = true;
+            count = true;
+        }
+        else if (arg == "-n") {
+            line_number = true;
+        }
+        else if (arg == "-h") {
+            print_file_names = false;
+        }
+        else if (arg == "-s") {
+            suppress_errors = true;
+        }
+        else if (arg == "-o") {
+            only_matching = true;
+        }
+        else {
+            if (template_str.empty()) {
+                template_str = arg; // Первый аргумент без опций считается шаблоном
+            } else {
+                filenames.push_back(arg); // Остальные аргументы считаются именами файлов
+            }
+        }
+    }
 
-	for (int i = 3; i < argc; i++) {
-		std::string option = argv[i];
-		if (option == "-i") {
-			ignoreCase = true;
-		}
-		else if (option == "-v") {
-			invertMatch = true;
-		}
-		else if (option == "-c") {
-			countMatches = true;
-		}
-		else if (option == "-l") {
-			matchFilesOnly = true;
-		}
-		else if (option == "-n") {
-			lineNumber = true;
-		}
-		else if (option == "-o") {
-			matchingFile = true;
-		}
-	}
+    if (filenames.empty()) {
+        filenames.push_back("-"); // Если файлы не указаны, использовать стандартный ввод
+    }
 
-	searchInFile(filename, searchTerm, ignoreCase, invertMatch, countMatches, matchFilesOnly, lineNumber, matchingFile);
+    grep(template_str, filenames, ignore_case, invert_match, count, print_file_names, line_number, suppress_errors, only_matching);
 
-	return 0;
+    return 0;
 }
